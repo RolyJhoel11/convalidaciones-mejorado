@@ -1,0 +1,26 @@
+GESTIÓN 2023 - 2025
+
+Esta actualización añade una opción al lado de Gestión 1998.
+
+ACTUALIZACIÓN DEL PDF
+- El PDF ordena ambos lados por el plan ajustado y mantiene cada materia de 2023 frente a su equivalencia.
+- Cuando varias materias llevan al mismo destino, la celda del ajustado se une para evitar duplicar la materia.
+- CONV. 1998 aparece junto al nombre de las materias heredadas, en pantalla y en el PDF.
+- Generar final (3 columnas) reúne las materias seleccionadas en 1998, las heredadas y las nuevas aprobadas en 2023, y sus equivalencias ajustadas.
+- En el final, APROB. 2023 identifica las nuevas aprobadas y CONV. 1998 / CONV. 2023 identifica el origen del resultado ajustado.
+- Las materias antiguas seleccionadas sin equivalencia se conservan al final del documento combinado.
+
+1. Seleccione las menciones como en el sistema original.
+2. En Gestión 1998, marque las materias antiguas y elija sus electivas normalmente.
+3. Abra Gestión 2023 - 2025.
+4. Las materias convalidadas desde 1998 aparecen marcadas y bloqueadas.
+5. Marque las demás materias que aprobó en el plan 2023. La segunda columna muestra su equivalencia con las siglas del plan 2023 ajustado.
+6. Genere el PDF desde esta opción para obtener solamente las dos columnas: 2023 y 2023 ajustado. Incluye tanto las materias heredadas como las seleccionadas aquí. Cada materia del destino aparece una sola vez, ordenada por semestre y por el catálogo de electivas.
+
+La selección adicional se guarda por mención en el navegador. Limpiar selección en esta opción conserva las convalidaciones heredadas. Si modifica la selección de 1998, la nueva opción se actualiza automáticamente. Los talleres de Técnico Superior de las distintas especialidades tienen el mismo destino: Taller de Proyecto.
+
+Para generar el PDF de tres columnas del sistema original, vuelva a Gestión 1998. Ese documento conserva su comportamiento original. Para generar el documento combinado con lo marcado en ambas gestiones, pulse Generar final (3 columnas) dentro de Gestión 2023 - 2025.
+
+Se mantuvieron intactos app.js, data.js, history-reader.mjs, styles.css, print.css y los recursos originales. index.html solo incorpora tres referencias para cargar gestion-data.js, gestion.js y gestion.css.
+
+Abra index.html de la carpeta extraída como antes. Si usa GitHub Pages u otro servidor estático, suba la carpeta completa incluyendo los tres archivos nuevos.

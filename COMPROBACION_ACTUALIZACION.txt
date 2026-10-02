@@ -1,0 +1,19 @@
+COMPROBACIÓN DE LA ACTUALIZACIÓN 19.1
+
+ARCHIVOS PRINCIPALES ACTUALIZADOS:
+- index.html
+- app.js
+- print.css
+- data.js
+- scripts/build_data.py
+
+MARCAS VISIBLES:
+- EJ. QUISPE MAMANI ANDREA
+- SUBIR HISTORIAL EN PDF (SI TIENE)
+- LOGO DE KARDEX EN LA PESTAÑA
+
+VALIDACIÓN DE SEMESTRES:
+- EST-133 -> INF-124 ESTADÍSTICA I -> 2.º SEMESTRE
+- EST-145 -> INF-134 ESTADÍSTICA II -> 3.º SEMESTRE
+
+La comprobación se realizó en las siete menciones.

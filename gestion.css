@@ -1,0 +1,5 @@
+.gestion-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}.gestion-tabs button{border:1px solid #b9c7d4;border-radius:9px;padding:9px 16px;background:#fff;color:var(--navy);font:inherit;font-size:.9rem;font-weight:800;cursor:pointer}.gestion-tabs button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}.gestion-tabs button:focus-visible{outline:3px solid #8dbce5;outline-offset:2px}.matrix.gestion-matrix{grid-template-columns:1fr 1fr;min-width:650px}.gestion-matrix .plan-old[hidden]{display:none}.gestion-locked{cursor:default;background:#edf6fb!important}.gestion-locked .status-label{display:block;color:var(--blue);font-size:.73rem;margin-top:5px}.gestion-locked input:disabled{opacity:1}
+@media print{.print-view.gestion-print .code-col{width:11.25%}.print-view.gestion-print .name-col{width:38.75%}}
+
+.gestion-final-button{position:fixed;right:220px;bottom:24px;z-index:8;box-shadow:0 8px 20px rgba(18,58,102,.15)}.gestion-final-button[hidden]{display:none!important}
+@media(max-width:540px){.gestion-final-button{right:24px;bottom:78px}}

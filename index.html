@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123a66">
+  <title>Sistema de Convalidaciones</title>
+  <meta name="description" content="Consulta de convalidaciones de materias entre los planes 1998, 2023 y 2023 ajustado.">
+  <link rel="icon" type="image/png" href="assets/logo-kardex-transparente.png?v=19.1">
+  <link rel="stylesheet" href="styles.css?v=19.1">
+  <link rel="stylesheet" href="print.css?v=19.3">
+  <link rel="stylesheet" href="gestion.css?v=2">
+</head>
+<body>
+  <header class="topbar">
+    <img class="header-logo header-logo-kardex" src="assets/logo-kardex-transparente.png" alt="Kardex de la Carrera de Informática">
+    <div class="brand-copy">
+      <p class="eyebrow">KARDEX - CARRERA DE INFORMÁTICA</p>
+      <h1>Sistema de Convalidaciones</h1>
+    </div>
+    <div class="save-state" id="saveState"><i></i> Guardado en este dispositivo</div>
+    <img class="header-logo header-logo-informatica" src="assets/logo-informatica-transparente.png" alt="UMSA Carrera de Informática">
+  </header>
+
+  <main>
+    <section class="setup-card" aria-labelledby="datos-title">
+      <div>
+        <p class="step">01 · Datos del estudiante</p>
+        <h2 id="datos-title">Prepara tu consulta</h2>
+      </div>
+      <div class="setup-grid">
+        <label>Apellidos y nombres
+          <input id="studentName" autocomplete="name" placeholder="EJ. QUISPE MAMANI ANDREA">
+        </label>
+        <label>Cédula de identidad (CI)
+          <input id="studentCi" autocomplete="off" inputmode="numeric" pattern="[0-9]*" placeholder="Ej. 12345678">
+        </label>
+        <label>Registro Universitario (RU)
+          <input id="studentRu" autocomplete="off" inputmode="numeric" pattern="[0-9]*" placeholder="Ej. 1836661">
+        </label>
+        <label>Mención del plan 1998 (obligatoria)
+          <select id="oldMentionSelect" aria-label="Mención del plan 1998" required></select>
+        </label>
+        <label>Mención de destino (obligatoria)
+          <select id="careerSelect" aria-label="Mención de destino" required></select>
+        </label>
+      </div>
+      <button class="history-upload-toggle" id="toggleHistoryButton" type="button" aria-expanded="false" aria-controls="historyReader">SUBIR HISTORIAL EN PDF (SI TIENE)</button>
+      <div class="history-reader" id="historyReader" hidden>
+        <div>
+          <strong>Lectura opcional del historial académico</strong>
+          <p id="readerHelp">Puedes cargar el archivo antes o después de elegir las menciones. Si todavía faltan, quedará preparado y se leerá automáticamente cuando completes ambas.</p>
+        </div>
+        <label class="reader-dropzone" id="historyDropZone" tabindex="0" aria-describedby="readerHelp">
+          <span class="reader-drop-icon" aria-hidden="true">⇧</span>
+          <span class="reader-drop-title">Arrastra el historial aquí</span>
+          <span class="reader-drop-subtitle">PDF, PNG o JPG</span>
+          <span class="reader-drop-or">o</span>
+          <span class="reader-upload">Seleccionar archivo</span>
+          <span class="reader-file-name" id="readerFileName" hidden></span>
+          <input id="historyFile" type="file" accept="application/pdf,image/png,image/jpeg" aria-label="Seleccionar historial académico en PDF o imagen">
+        </label>
+        <div class="reader-feedback" id="readerFeedback" hidden>
+          <progress id="readerProgress" max="100" value="0"></progress>
+          <span id="readerStatus"></span>
+        </div>
+        <div class="reader-result" id="readerResult" hidden></div>
+      </div>
+      <p class="local-note">Tu avance se guarda automáticamente en este navegador. No se envía información a una base de datos.</p>
+    </section>
+
+    <section class="workspace" id="workspaceSection" aria-labelledby="materias-title" hidden>
+      <div class="workspace-head">
+        <div>
+          <p class="step">02 · Materias aprobadas</p>
+          <h2 id="materias-title">Selecciona solo en el plan 1998</h2>
+          <p class="help">Las otras columnas se completan automáticamente según las equivalencias.</p>
+        </div>
+        <div class="progress-block" aria-live="polite">
+          <div><strong id="selectedCount">0</strong><span>seleccionadas</span></div>
+          <div><strong id="validatedCount">0</strong><span>convalidadas</span></div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <label class="search"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Buscar por sigla o asignatura"></label>
+        <button class="ghost" id="clearButton" type="button">Limpiar selección</button>
+      </div>
+
+      <div class="legend" aria-label="Leyenda">
+        <span><i class="dot selected"></i> Aprobada</span>
+        <span><i class="dot complete"></i> Convalidación completa</span>
+        <span><i class="dot pending"></i> Falta elegir una electiva</span>
+      </div>
+
+      <div class="table-wrap">
+        <div class="matrix" role="table" aria-label="Matriz de convalidación">
+          <div class="matrix-header plan-old" role="columnheader"><span>Plan de estudios</span><strong>1998</strong><small>Selecciona aquí</small></div>
+          <div class="matrix-header plan-mid" role="columnheader"><span>Plan de estudios</span><strong>2023</strong><small>Resultado intermedio</small></div>
+          <div class="matrix-header plan-new" role="columnheader"><span>Plan de estudios</span><strong>2023 ajustado</strong><small>Resultado final</small></div>
+          <div id="matrixRows" class="matrix-rows"></div>
+        </div>
+      </div>
+      <div id="emptyState" class="empty" hidden>No se encontraron materias con esa búsqueda.</div>
+    </section>
+
+    <section class="summary" id="summarySection" aria-labelledby="resumen-title" hidden>
+      <div>
+        <p class="step">03 · Documento</p>
+        <h2 id="resumen-title">Genera tu tabla de convalidación</h2>
+        <p>Incluye el nombre, el CI, la mención antigua, la mención nueva y las tres columnas.</p>
+      </div>
+      <button class="primary" id="pdfButton" type="button">Generar PDF</button>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <section id="printView" class="print-view" aria-hidden="true">
+    <div class="print-header">
+      <img class="print-logo print-logo-kardex" src="assets/logo-kardex-transparente.png" alt="Logo de Kardex">
+      <div>
+        <p class="print-unit">KARDEX - CARRERA DE INFORMÁTICA</p>
+        <h1>TABLA DE CONVALIDACIÓN DE PLANES DE ESTUDIO</h1>
+        <p>Plan 1998 - Plan 2023 - Plan 2023 ajustado</p>
+      </div>
+      <img class="print-logo print-logo-informatica" src="assets/logo-informatica-transparente.png" alt="Logo de la Carrera de Informática">
+    </div>
+    <dl class="print-meta"><div><dt>Estudiante:</dt><dd id="printName"></dd></div><div><dt>CI:</dt><dd id="printCi"></dd></div><div><dt>RU:</dt><dd id="printRu"></dd></div><div><dt>Mención:</dt><dd id="printCareer"></dd></div><div><dt>Fecha:</dt><dd id="printDate"></dd></div></dl>
+    <table>
+      <colgroup><col class="code-col"><col class="name-col"><col class="code-col"><col class="name-col"><col class="code-col"><col class="name-col"></colgroup>
+      <thead>
+        <tr class="plan-title-row">
+          <th colspan="2">PÉNSUM 1998<br><span>MENCIÓN <b id="printPlan1998"></b></span><br><span>NIVEL LICENCIATURA</span></th>
+          <th colspan="2">PÉNSUM 2023<br><span>MENCIÓN <b id="printPlan2023"></b></span><br><span>NIVEL LICENCIATURA</span></th>
+          <th colspan="2">PÉNSUM 2023 AJUSTADO<br><span>MENCIÓN <b id="printPlanAdjusted"></b></span><br><span>NIVEL LICENCIATURA</span></th>
+        </tr>
+        <tr class="column-title-row"><th>SIGLA</th><th>ASIGNATURA</th><th>SIGLA</th><th>ASIGNATURA</th><th>SIGLA</th><th>ASIGNATURA</th></tr>
+      </thead>
+      <tbody id="printRows"></tbody>
+    </table>
+    <p class="print-count">Número de materias convalidadas: <strong id="printCount">0</strong></p>
+    <p class="print-note">Documento generado por el Sistema de Convalidaciones. Será revisado y validado por la Unidad de Kardex de la Carrera de Informática.</p>
+  </section>
+
+  <script src="data.js?v=19.3"></script>
+  <script src="app.js?v=19.4"></script>
+  <script src="gestion-data.js?v=1"></script>
+  <script src="gestion.js?v=2"></script>
+  <script src="assets/vendor/tesseract.min.js"></script>
+  <script type="module" src="history-reader.mjs?v=19.1"></script>
+</body>
+</html>
