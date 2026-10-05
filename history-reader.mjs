@@ -8,7 +8,7 @@ const fileName = typeof document !== "undefined" ? document.getElementById("read
 let isReading = false;
 let pendingFile = null;
 
-const normalizeText = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[‐‑‒–—]/g, "-").replace(/[^A-Z0-9()/:.\-\n ]+/g, " ").replace(/[ \t]+/g, " ");
+const normalizeText = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[‐‑‒–—]/g, "-").replace(/[^A-Z0-9()/:.\-\n\f ]+/g, " ").replace(/[ \t]+/g, " ");
 const digitsOnly = (value) => String(value || "").replace(/\D/g, "");
 const ignoredTokens = new Set(["DE", "DEL", "LA", "LAS", "EL", "LOS", "PARA", "Y", "E", "I", "II", "III", "IV"]);
 const approvalPattern = /\b(?:APR[O0]B(?:ADO|ADA)?|CONV(?:ALIDADO|ALIDADA)?\.?|VALIDAD[AO])\b/;
@@ -80,38 +80,14 @@ function matchingCourseBlocks(normalized, code) {
 
 function detectOldCourses(text, rows) {
   const normalized = normalizeText(text);
-  const lines = normalized.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-  const detected = [];
-  for (const row of rows || []) {
+  // Cada registro termina antes de la siguiente sigla o página. Nunca toma
+  // el estado de aprobación de una materia vecina ni deduce aprobación del nombre.
+  return (rows || []).filter(row => {
     const code = canonicalCode(row.code);
-    const tokens = courseTokens(row.name);
-    let found = false;
-
-    // Primero analiza el registro completo comprendido entre una sigla y la siguiente.
-    // Esto funciona aunque las columnas del PDF se extraigan separadas o desordenadas.
-    for (const block of matchingCourseBlocks(normalized, code)) {
-      const tokenMatches = tokens.filter((token) => tokenPresent(block, token)).length;
-      const enoughName = tokens.length === 0 || tokenMatches >= Math.min(2, tokens.length);
-      const strongName = tokens.length > 0 && tokenMatches >= Math.max(1, Math.ceil(tokens.length * 0.6));
-      if (!nonApprovalPattern.test(block) && enoughName && (approvalPattern.test(block) || strongName)) {
-        found = true;
-        break;
-      }
-    }
-
-    // Respaldo para PDFs cuyas celdas terminan repartidas en varias líneas.
-    for (let index = 0; index < lines.length && !found; index += 1) {
-      if (!lineMatchesCode(lines[index], code)) continue;
-      if (nonApprovalPattern.test(lines[index])) continue;
-      const nearby = lines.slice(Math.max(0, index - 3), Math.min(lines.length, index + 8)).join(" ");
-      const tokenMatches = tokens.filter((token) => tokenPresent(nearby, token)).length;
-      const enoughName = tokens.length === 0 || tokenMatches >= Math.min(2, tokens.length);
-      const strongName = tokens.length > 0 && tokenMatches >= Math.max(1, Math.ceil(tokens.length * 0.6));
-      if (!nonApprovalPattern.test(nearby) && enoughName && (approvalPattern.test(nearby) || strongName)) found = true;
-    }
-    if (found) detected.push(row);
-  }
-  return detected;
+    return normalized.split('\f').some(page => matchingCourseBlocks(page, code).some(block =>
+      approvalPattern.test(block) && !nonApprovalPattern.test(block)
+    ));
+  });
 }
 
 function parseHistoryText(text, rows) {
@@ -126,13 +102,23 @@ function updateProgress(value, message) {
 }
 
 function pdfItemsToText(items) {
-  const lines = new Map();
+  const lines = [];
   for (const item of items) {
-    const y = Math.round((item.transform?.[5] || 0) / 3) * 3;
-    if (!lines.has(y)) lines.set(y, []);
-    lines.get(y).push({x:item.transform?.[4] || 0, text:item.str || ""});
+    if (!item.str || !item.transform) continue;
+    const x = item.transform[4], y = item.transform[5];
+    const height = Math.abs(item.height || item.transform[3] || 10);
+    let line = lines.find(line => Math.abs(line.y-y) <= Math.max(1, Math.min(line.height,height)*0.25));
+    if (!line) { line = {y,height,items:[]}; lines.push(line); }
+    line.items.push({x,width:item.width || 0,text:item.str});
   }
-  return [...lines.entries()].sort((a, b) => b[0] - a[0]).map(([, values]) => values.sort((a, b) => a.x - b.x).map((value) => value.text).join(" ")).join("\n");
+  return lines.sort((a,b)=>b.y-a.y).map(line => {
+    const values = line.items.sort((a,b)=>a.x-b.x);
+    return values.map((value,i) => {
+      const previous = values[i-1];
+      const gap = previous ? value.x-previous.x-previous.width : 0;
+      return (i && gap > 1 && !/\s$/.test(previous.text) ? ' ' : '') + value.text;
+    }).join('');
+  }).join('\n');
 }
 
 async function loadPdf(file) {
@@ -148,7 +134,7 @@ async function loadPdf(file) {
     const content = await page.getTextContent();
     const pageText = pdfItemsToText(content.items);
     pageTexts.push(pageText);
-    text += `${pageText}\n`;
+    text += `${pageText}\n\f`;
   }
   return {pdf, text, pageTexts};
 }
@@ -191,7 +177,7 @@ async function ocrPdf(pdf, requestedPages = null) {
   const worker = await createOcrWorker();
   let text = "";
   try {
-    const pages = requestedPages?.length ? requestedPages : Array.from({length:Math.min(pdf.numPages, 12)}, (_, index) => index + 1);
+    const pages = requestedPages?.length ? requestedPages : Array.from({length:pdf.numPages}, (_, index) => index + 1);
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
       const pageNumber = pages[pageIndex];
       updateProgress(30 + (pageIndex / pages.length) * 65, `Preparando página escaneada (${pageIndex + 1}/${pages.length})…`);
@@ -204,7 +190,7 @@ async function ocrPdf(pdf, requestedPages = null) {
       canvas.height = Math.ceil(viewport.height);
       await page.render({canvasContext:canvas.getContext("2d", {willReadFrequently:true}), viewport}).promise;
       const response = await worker.recognize(improveDocumentCanvas(canvas));
-      text += `${response.data.text}\n`;
+      text += `${response.data.text}\n\f`;
     }
   } finally {
     await worker.terminate();
@@ -253,14 +239,18 @@ async function handleFile(file) {
   let text = "";
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
     const loaded = await loadPdf(file);
-    text = loaded.text;
-    const initial = parseHistoryText(text, context.rows);
-    const sparsePages = loaded.pageTexts.map((pageText, index) => ({page:index + 1, length:normalizeText(pageText).replace(/\s/g, "").length})).filter((item) => item.length < 180).map((item) => item.page);
-    const needsFullOcr = normalizeText(text).replace(/\s/g, "").length < 250 || initial.courses.length === 0 || !initial.name || !initial.ci || !initial.ru;
-    if (needsFullOcr || sparsePages.length) {
-      updateProgress(30, "Completando la lectura del PDF mediante reconocimiento de imágenes…");
-      const ocrText = await ocrPdf(loaded.pdf, needsFullOcr ? null : sparsePages);
-      text = `${text}\n${ocrText}`;
+    try {
+      // Un PDF con texto se lee directamente. La falta de CI/RU o de materias
+      // aprobadas no convierte una página digital en una imagen para OCR.
+      const scannedPages = loaded.pageTexts.map((pageText,index) => ({page:index+1,
+        empty:normalizeText(pageText).replace(/\s/g,'').length < 20})).filter(page=>page.empty).map(page=>page.page);
+      text = loaded.text;
+      if (scannedPages.length) {
+        updateProgress(30, 'Leyendo únicamente las páginas sin texto mediante OCR…');
+        text += `\f${await ocrPdf(loaded.pdf, scannedPages)}`;
+      }
+    } finally {
+      await loaded.pdf.destroy();
     }
   } else if (/^image\/(png|jpeg)$/.test(file.type)) {
     text = await ocrImage(file);
@@ -364,4 +354,4 @@ if (dropZone) {
   });
 }
 
-export {normalizeText, extractIdentity, detectOldCourses, parseHistoryText};
+export {normalizeText, extractIdentity, detectOldCourses, parseHistoryText, pdfItemsToText};

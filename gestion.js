@@ -1,5 +1,26 @@
-// Extensión independiente: no altera las reglas ni los datos del flujo 1998.
+// Extensión de gestión 2023 y prioridad de las equivalencias de 64 horas.
 (() => {
+  const themeButton = $('themeToggle');
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+  let themePreference = null;
+  try { themePreference = localStorage.getItem('convalidaciones-theme'); } catch (_) {}
+  function applyTheme() {
+    const dark = themePreference === 'dark' || (themePreference !== 'light' && systemTheme.matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    themeButton.setAttribute('aria-label', dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro');
+    themeButton.title = dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
+    themeButton.setAttribute('aria-pressed', String(dark));
+    themeButton.innerHTML = dark
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15a8 8 0 0 1-11-11A8.5 8.5 0 1 0 20 15Z"/></svg>';
+  }
+  themeButton.addEventListener('click', () => {
+    themePreference = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('convalidaciones-theme', themePreference); } catch (_) {}
+    applyTheme();
+  });
+  systemTheme.addEventListener('change', applyTheme);
+  applyTheme();
   const KEY = 'convalidaciones-umsa-gestion-2023-v1';
   let mode = '1998';
   let saved = {};
@@ -17,9 +38,54 @@
     }
     return codes;
   }
+  // La gestión corresponde a la aprobación en 2023, no a una convalidación de 1998.
+  const SEMESTER_KEY = KEY + '-semestres';
+  let semesterByCareer = {};
+  try { semesterByCareer = JSON.parse(localStorage.getItem(SEMESTER_KEY) || '{}') || {}; } catch (_) {}
+  const specialCodes = ['INF-111','INF-121','INF-131'];
+  const specialTargets = {
+    desarrollo:['INF-319','INF-325','INF-326'], sistemas:['INF-319','SIS-313','INF-326'],
+    ia:['DAT-312','INF-325','INF-336'], redes:['TIC-311','TIC-312','TIC-316'],
+    seguridad:['SEG-316','INF-325','SEG-317'], industrial:['INF-319','IID-313','IID-312'],
+    computacion:['COM-323','COM-317','INF-336']
+  };
+  const semesters = Array.from({length:8},(_,i)=>[ `I/${2023+i}`, `II/${2023+i}` ]).flat();
+  const eligible = value => ['I/2023','II/2023','I/2024','II/2024'].includes(value);
+  const semesterValues = () => semesterByCareer[state.career] || (semesterByCareer[state.career] = {});
+  function specialCourses() {
+    return specialCodes.flatMap((code,index) => {
+      if (!manual().has(code) || inheritedCodes().has(code) || !eligible(semesterValues()[code])) return [];
+      const source = catalog().find(course => course.middleCode === code);
+      const target = catalog().find(course => course.finalCode === specialTargets[state.career]?.[index]);
+      return source && target ? [{...target, id:`64-${code}`, middleCode:source.middleCode,
+        middleName:`${source.middleName} · 64 HORAS · ${semesterValues()[code]}`}]:[];
+    });
+  }
+  const reservedElectives = () => new Set(specialCourses().map(course => course.finalCode));
+  function reconcileOldSelections() {
+    const reserved = reservedElectives();
+    let changed = false;
+    for (const row of DATA[state.career]?.rows || []) {
+      if (!selectedSet().has(row.id)) continue;
+      const target = isGenericElective(row) ? selectedElective(row) : row;
+      if (!reserved.has(target?.finalCode)) continue;
+      // Una electiva genérica conserva su materia de origen aprobada.
+      // Solo se libera el destino elegido para que seleccione otra electiva.
+      if (!isGenericElective(row)) selectedSet().delete(row.id);
+      delete choiceMap()[row.id];
+      changed = true;
+    }
+    if (changed) saveState();
+    return reserved;
+  }
+  // También bloquea estos destinos en los menús de electivas del plan antiguo.
+  const originalConvalidatedElectiveCodes = convalidatedElectiveCodes;
+  convalidatedElectiveCodes = function() {
+    return new Set([...originalConvalidatedElectiveCodes(), ...reservedElectives()]);
+  };
   const approved = () => {
     const inherited = inheritedCodes();
-    return catalog().filter(course => inherited.has(course.finalCode) || manual().has(course.id));
+    return [...catalog().filter(course => inherited.has(course.finalCode) || manual().has(course.id)), ...specialCourses()];
   };
   const matrix = document.querySelector('.matrix');
   const oldHeader = document.querySelector('.matrix-header.plan-old');
@@ -29,58 +95,140 @@
   const originalHelp = help.textContent;
   const summary = document.querySelector('#summarySection p:not(.step)');
   const originalSummary = summary.textContent;
-  const tabs = document.createElement('div');
-  tabs.className = 'gestion-tabs';
-  tabs.setAttribute('role','group');
-  tabs.setAttribute('aria-label','Gestión de convalidación');
-  tabs.innerHTML = '<button type="button" data-gestion="1998" aria-pressed="true">Gestión 1998</button><button type="button" data-gestion="2023" aria-pressed="false">Gestión 2023 - 2025</button>';
-  $('materias-title').before(tabs);
-  const finalPdfButton = document.createElement('button');
-  finalPdfButton.id = 'finalPdfButton';
-  finalPdfButton.type = 'button';
-  finalPdfButton.className = 'ghost gestion-final-button';
-  finalPdfButton.textContent = 'Generar final (3 columnas)';
-  finalPdfButton.hidden = true;
-  $('pdfButton').before(finalPdfButton);
-  finalPdfButton.addEventListener('click', () => { if (buildPrintView(true)) setTimeout(() => window.print(), 50); });
+  const pdfMenu = document.createElement('div');
+  pdfMenu.id = 'gestionPdfMenu';
+  pdfMenu.className = 'gestion-pdf-menu';
+  pdfMenu.hidden = true;
+  pdfMenu.setAttribute('aria-label', 'Tipo de informe PDF');
+  $('pdfButton').before(pdfMenu);
+  $('pdfButton').setAttribute('aria-expanded', 'false');
+  $('pdfButton').setAttribute('aria-controls', pdfMenu.id);
+  function closePdfMenu() {
+    pdfMenu.hidden = true;
+    $('pdfButton').setAttribute('aria-expanded', 'false');
+  }
+  function updatePdfMenu() {
+    pdfMenu.innerHTML = '<button type="button" data-report="old">1998 → 2023</button>' +
+      (mode === '2023' ? '<button type="button" data-report="modern">2023 → 2023 ajustado</button><button type="button" data-report="final">Informe final</button>' : '');
+  }
+  function positionPdfMenu() {
+    if (pdfMenu.hidden) return;
+    const button = $('pdfButton').getBoundingClientRect();
+    const width = pdfMenu.getBoundingClientRect().width;
+    pdfMenu.style.left = `${Math.max(12, Math.min(button.right - width, window.innerWidth - width - 12))}px`;
+    pdfMenu.style.right = 'auto';
+    pdfMenu.style.bottom = `${window.innerHeight - button.top + 8}px`;
+    pdfMenu.style.maxHeight = `${Math.max(100, button.top - 20)}px`;
+  }
+  window.addEventListener('resize', positionPdfMenu);
+  $('pdfButton').addEventListener('click', event => {
+    event.stopImmediatePropagation();
+    updatePdfMenu();
+    pdfMenu.hidden = !pdfMenu.hidden;
+    $('pdfButton').setAttribute('aria-expanded', String(!pdfMenu.hidden));
+    if (!pdfMenu.hidden) { positionPdfMenu(); pdfMenu.querySelector('button')?.focus(); }
+  }, true);
+  pdfMenu.addEventListener('click', event => {
+    const button = event.target.closest('button[data-report]');
+    if (!button) return;
+    closePdfMenu();
+    if (buildPrintView(button.dataset.report)) setTimeout(() => window.print(), 50);
+  });
+  document.addEventListener('click', event => {
+    if (!pdfMenu.contains(event.target) && !$('pdfButton').contains(event.target)) closePdfMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !pdfMenu.hidden) {
+      closePdfMenu(); $('pdfButton').focus();
+    }
+  });
+  const nextButton = document.createElement('button');
+  nextButton.id = 'gestionNextButton';
+  nextButton.type = 'button';
+  nextButton.className = 'ghost gestion-next-button';
+  nextButton.textContent = 'Siguiente →';
+  nextButton.setAttribute('aria-label', 'Siguiente: convalidación del plan 2023');
+  nextButton.hidden = true;
+  $('pdfButton').before(nextButton);
+  function switchMode(nextMode) {
+    closePdfMenu();
+    mode = nextMode;
+    state.search = ''; $('searchInput').value = '';
+    render();
+  }
+  nextButton.addEventListener('click', () => switchMode(mode === '1998' ? '2023' : '1998'));
   const originalRender = render;
   render = function() {
+    const reserved = reconcileOldSelections();
     originalRender();
     const modern = mode === '2023';
-    finalPdfButton.hidden = !modern || $('summarySection').hidden;
+    nextButton.hidden = $('summarySection').hidden;
+    nextButton.textContent = modern ? '← Atrás' : 'Siguiente →';
+    nextButton.setAttribute('aria-label', modern ? 'Atrás: plan 1998' : 'Siguiente: plan 2023');
     matrix.classList.toggle('gestion-matrix', modern);
     oldHeader.hidden = modern;
     middleHeader.innerHTML = modern ? '<span>Plan de estudios</span><strong>2023</strong><small>Selecciona aquí</small>' : middleHeaderHtml;
     $('materias-title').textContent = modern ? 'Selecciona las materias aprobadas del plan 2023' : 'Selecciona solo en el plan 1998';
     help.textContent = modern ? 'Las materias convalidadas desde 1998 están marcadas y bloqueadas. Marca las demás materias que aprobaste en 2023.' : originalHelp;
-    summary.textContent = modern ? 'Generar PDF: 2023 y ajustado. Generar final: 1998, 2023 y ajustado, incluyendo las materias heredadas y las nuevas aprobadas.' : originalSummary;
-    tabs.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.gestion === mode)));
-    if (!modern || $('workspaceSection').hidden) return;
+    summary.textContent = modern ? 'Elige el informe del plan 2023 o el informe final con los tres planes.' : originalSummary;
+    if ($('workspaceSection').hidden) return;
+    if (!modern) {
+      // La equivalencia obligatoria desde 2023 tiene prioridad sobre la antigua.
+      for (const input of $('matrixRows').querySelectorAll('input[data-id]')) {
+        const row = DATA[state.career].rows.find(item => item.id === input.dataset.id);
+        if (row && reserved.has(row.finalCode)) {
+          input.checked = false;
+          input.disabled = true;
+        }
+      }
+      return;
+    }
     const inherited = inheritedCodes();
+    const from64Hours = new Set(specialCourses().map(course => course.finalCode));
     const query = state.search.trim().toLocaleLowerCase('es');
     const filtered = catalog().filter(course => !query || `${course.middleCode} ${course.middleName} ${course.finalCode} ${course.finalName}`.toLocaleLowerCase('es').includes(query));
     $('matrixRows').innerHTML = filtered.map(course => {
-      const locked = inherited.has(course.finalCode);
+      const from1998 = inherited.has(course.finalCode);
+      const locked = from1998 || from64Hours.has(course.finalCode);
       const checked = locked || manual().has(course.id);
-      return `<div class="course-row" role="row"><label class="cell cell-source ${locked ? 'gestion-locked' : ''}" role="cell"><input type="checkbox" data-gestion-id="${escapeHtml(course.id)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} aria-label="${escapeHtml(course.middleCode+' '+courseName(course.middleName))}${locked ? ', convalidada desde 1998' : ''}"><span><span class="code">${escapeHtml(course.middleCode)}</span><span class="name">${escapeHtml(courseName(course.middleName))}${locked ? ' · CONV. 1998' : ''}</span></span></label><div class="cell cell-result ${checked ? 'ready' : ''}" role="cell">${checked ? `<div><span class="code">${escapeHtml(course.finalCode)}</span><span class="name">${escapeHtml(courseName(course.finalName))}</span></div>` : '<span>—</span>'}</div></div>`;
+      return `<div class="course-row" role="row"><label class="cell cell-source ${locked ? 'gestion-locked' : ''}" role="cell"><input type="checkbox" data-gestion-id="${escapeHtml(course.id)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} aria-label="${escapeHtml(course.middleCode+' '+courseName(course.middleName))}${from1998 ? ', convalidada desde 1998' : ''}"><span><span class="code">${escapeHtml(course.middleCode)}</span><span class="name">${escapeHtml(courseName(course.middleName))}${from1998 ? ' · CONV. 1998' : ''}</span></span></label><div class="cell cell-result ${checked ? 'ready' : ''}" role="cell">${checked ? `<div><span class="code">${escapeHtml(course.finalCode)}</span><span class="name">${escapeHtml(courseName(course.finalName))}</span></div>` : '<span>—</span>'}</div></div>`;
     }).join('');
+    for (const input of $('matrixRows').querySelectorAll('input[data-gestion-id]')) {
+      if (!specialCodes.includes(input.dataset.gestionId) || input.disabled || !input.checked) continue;
+      const code = input.dataset.gestionId;
+      const holder = document.createElement('div');
+      holder.className = 'gestion-semester';
+      const target = catalog().find(course => course.finalCode === specialTargets[state.career]?.[specialCodes.indexOf(code)]);
+      holder.innerHTML = `<label>Gestión de aprobación (obligatoria)<select required data-semester-code="${code}" aria-label="Gestión de aprobación de ${code}"><option value="">Selecciona la gestión</option>${semesters.map(value => `<option value="${value}" ${semesterValues()[code] === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>${eligible(semesterValues()[code]) && target ? `<small>64 horas: también convalida ${escapeHtml(target.finalCode)} ${escapeHtml(courseName(target.finalName))}</small>` : ''}`;
+      input.closest('.cell').append(holder);
+
+    }
     $('emptyState').hidden = filtered.length > 0;
     $('selectedCount').textContent = approved().length;
     $('validatedCount').textContent = new Set(approved().map(course => course.finalCode)).size;
   };
-  tabs.addEventListener('click',event => {
-    const button = event.target.closest('button[data-gestion]');
-    if (!button) return;
-    mode = button.dataset.gestion;
-    state.search = ''; $('searchInput').value = '';
-    render();
-  });
   $('matrixRows').addEventListener('change',event => {
+    const select = event.target.closest('select[data-semester-code]');
+    if (select) {
+      event.stopImmediatePropagation();
+      semesterValues()[select.dataset.semesterCode] = select.value;
+      localStorage.setItem(SEMESTER_KEY, JSON.stringify(semesterByCareer));
+      render(); return;
+    }
+    const oldInput = event.target.closest('input[data-id]');
+    if (oldInput) {
+      const row = DATA[state.career]?.rows.find(item => item.id === oldInput.dataset.id);
+      if (row && reservedElectives().has(row.finalCode)) {
+        event.stopImmediatePropagation();
+        render();
+      }
+      return;
+    }
     const input = event.target.closest('input[data-gestion-id]');
     if (!input) return;
     event.stopImmediatePropagation();
     const course = catalog().find(item => item.id === input.dataset.gestionId);
-    if (!course || inheritedCodes().has(course.finalCode)) { render(); return; }
+    if (!course || inheritedCodes().has(course.finalCode) || specialCourses().some(item => item.finalCode === course.finalCode)) { render(); return; }
     input.checked ? manual().add(course.id) : manual().delete(course.id);
     persist(); render();
   },true);
@@ -102,7 +250,7 @@
     const groups = new Map();
     for (const course of courses) {
       if (!groups.has(course.finalCode)) groups.set(course.finalCode, {course, middle:[], old:[]});
-      const suffix = inherited.has(course.finalCode) ? ' · CONV. 1998' : (includeOld ? ' · APROB. 2023' : '');
+      const suffix = inherited.has(course.finalCode) ? ' · CONV. 1998' : '';
       groups.get(course.finalCode).middle.push({code:course.middleCode, name:courseName(course.middleName)+suffix, pendingClass:''});
     }
     const unmatched = [];
@@ -126,22 +274,52 @@
     const rowspan = index === entries.length - 1 ? height - entries.length + 1 : 1;
     return printPlanCells({entry:entries[index],rowspan});
   }
-  buildPrintView = function(includeOld = false) {
-    $('printView').classList.toggle('gestion-print',mode === '2023' && !includeOld);
-    if (mode !== '2023') {
+  function goToChoice(nextMode, selector) {
+    switchMode(nextMode); // Limpia la búsqueda para que la materia pendiente sea visible.
+    const select = $('matrixRows').querySelector(selector);
+    if (!select) return;
+    select.focus({preventScroll:true});
+    select.scrollIntoView({behavior:'smooth', block:'center', inline:'nearest'});
+  }
+  buildPrintView = function(report = mode === '1998' ? 'old' : 'modern') {
+    // Cada tipo de informe mantiene su contenido aunque cambie la pantalla.
+    if (typeof report === 'boolean') report = report ? 'final' : (mode === '1998' ? 'old' : 'modern');
+    const includeOld = report === 'final';
+    if (report === 'old') {
+      const pending = DATA[state.career]?.rows.find(row => selectedSet().has(row.id) && isGenericElective(row) && !selectedElective(row));
+      if (pending) {
+        goToChoice('1998', `[data-elective-id="${pending.id}"]`);
+        toast(`Elige una electiva para ${pending.oldCode} antes de generar el PDF.`);
+        return false;
+      }
+      $('printView').classList.toggle('gestion-print', false);
       printTable.querySelector('colgroup').innerHTML = originalColgroup;
       printTable.querySelector('thead').innerHTML = originalThead;
       printSubtitle.textContent = originalSubtitle;
       return originalBuildPrintView();
     }
+    // Validación compartida: tampoco permite saltarse la gestión desde el PDF antiguo.
+    const missing = specialCodes.find(code => manual().has(code) && !inheritedCodes().has(code) && !semesters.includes(semesterValues()[code]));
+    if (missing) {
+      goToChoice('2023', `[data-semester-code="${missing}"]`);
+      toast(`Selecciona obligatoriamente la gestión de aprobación de ${missing}.`);
+      return false;
+    }
+    reconcileOldSelections();
+    // Todos los botones de PDF llevan a la primera elección pendiente del plan antiguo.
+    const pending = DATA[state.career]?.rows.find(row => selectedSet().has(row.id) && isGenericElective(row) && !selectedElective(row));
+    if (pending) {
+      goToChoice('1998', `[data-elective-id="${pending.id}"]`);
+      toast(`Elige una electiva para ${pending.oldCode} antes de generar el PDF.`);
+      return false;
+    }
+    $('printView').classList.toggle('gestion-print', !includeOld);
     if (!state.career || !DATA[state.career]) { toast('Selecciona la mención de destino.'); return false; }
     for (const [field,id,message] of [['name','studentName','nombre'],['ci','studentCi','CI'],['ru','studentRu','RU']]) {
       if (!state[field].trim()) { $(id).focus(); toast(`Escribe el ${message} del estudiante antes de generar el PDF.`); return false; }
     }
     if (includeOld) {
       if (!state.oldMention || !OLD_MENTIONS[state.oldMention]) { toast('Selecciona la mención del plan 1998.'); return false; }
-      const pending = DATA[state.career].rows.find(row => selectedSet().has(row.id) && isGenericElective(row) && !selectedElective(row));
-      if (pending) { toast(`Elige una electiva para ${pending.oldCode} en Gestión 1998 antes de generar el final.`); return false; }
     }
     const courses = approved();
     if (!courses.length) { toast('Selecciona al menos una materia aprobada.'); return false; }
@@ -157,7 +335,7 @@
       const section = printSectionKey(group.course.finalSection);
       if (section !== previous) {
         const label = escapeHtml(printSectionLabel(section));
-        rows.push(`<tr>${includeOld ? '<td colspan="2" class="print-empty"></td>' : ''}<td colspan="2" class="print-semester">${label} (ORDEN AJUSTADO)</td><td colspan="2" class="print-semester">${label}</td></tr>`);
+        rows.push(`<tr>${includeOld ? '<td colspan="2" class="print-empty"></td>' : ''}<td colspan="2" class="print-semester">${label}</td><td colspan="2" class="print-semester">${label}</td></tr>`);
         previous = section;
       }
       const height = Math.max(group.middle.length,includeOld ? group.old.length : 0,1);

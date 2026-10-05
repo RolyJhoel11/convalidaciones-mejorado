@@ -1,5 +1,28 @@
-.gestion-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}.gestion-tabs button{border:1px solid #b9c7d4;border-radius:9px;padding:9px 16px;background:#fff;color:var(--navy);font:inherit;font-size:.9rem;font-weight:800;cursor:pointer}.gestion-tabs button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}.gestion-tabs button:focus-visible{outline:3px solid #8dbce5;outline-offset:2px}.matrix.gestion-matrix{grid-template-columns:1fr 1fr;min-width:650px}.gestion-matrix .plan-old[hidden]{display:none}.gestion-locked{cursor:default;background:#edf6fb!important}.gestion-locked .status-label{display:block;color:var(--blue);font-size:.73rem;margin-top:5px}.gestion-locked input:disabled{opacity:1}
+.matrix.gestion-matrix{grid-template-columns:1fr 1fr;min-width:650px}.gestion-matrix .plan-old[hidden]{display:none}.gestion-locked{cursor:default;background:#edf6fb!important}.gestion-locked .status-label{display:block;color:var(--blue);font-size:.73rem;margin-top:5px}.gestion-locked input:disabled{opacity:1}
 @media print{.print-view.gestion-print .code-col{width:11.25%}.print-view.gestion-print .name-col{width:38.75%}}
 
-.gestion-final-button{position:fixed;right:220px;bottom:24px;z-index:8;box-shadow:0 8px 20px rgba(18,58,102,.15)}.gestion-final-button[hidden]{display:none!important}
-@media(max-width:540px){.gestion-final-button{right:24px;bottom:78px}}
+.gestion-next-button{position:fixed;right:220px;bottom:24px;z-index:8;box-shadow:0 8px 20px rgba(18,58,102,.15)}.gestion-next-button[hidden]{display:none!important}
+@media(max-width:540px){.gestion-next-button{right:24px;bottom:78px}}
+
+.gestion-semester{display:flex;flex-direction:column;gap:6px;margin-left:12px;max-width:280px}.gestion-semester label{font-size:.8rem}.gestion-semester select{display:block;width:100%;margin-top:4px;padding:6px;border:1px solid #b9c7d4;border-radius:6px}.gestion-semester small{font-size:.75rem;color:var(--navy)}
+
+.gestion-pdf-menu{position:fixed;right:24px;bottom:82px;z-index:12;display:flex;flex-direction:column;gap:4px;width:280px;max-width:calc(100vw - 48px);padding:8px;background:#fff;border:1px solid #b9c7d4;border-radius:10px;box-shadow:0 8px 24px rgba(18,58,102,.2)}.gestion-pdf-menu[hidden]{display:none!important}.gestion-pdf-menu button{padding:12px;text-align:left;border:0;border-radius:6px;background:#fff;color:var(--navy);font:inherit;font-weight:700;cursor:pointer}.gestion-pdf-menu button:hover,.gestion-pdf-menu button:focus-visible{background:#edf6fb}.gestion-pdf-menu button:focus-visible{outline:2px solid var(--blue)}
+@media(max-width:540px){.gestion-pdf-menu{bottom:136px}}
+
+/* Acciones principales y menú anclado sobre Generar PDF. */
+.gestion-next-button{min-width:190px;min-height:56px;padding:14px 24px;font-size:1.08rem;font-weight:850;border:2px solid #0b745e;background:#087a61;color:#fff;box-shadow:0 6px 22px rgba(8,122,97,.35)}
+.gestion-next-button:hover{background:#06634f;color:#fff}.gestion-next-button:focus-visible{outline:3px solid #52cbb0;outline-offset:3px}
+.gestion-pdf-menu{overflow-y:auto}
+@media(max-width:760px){.gestion-next-button{left:12px;right:12px;bottom:72px;width:auto;min-height:52px}body{padding-bottom:142px}}
+@media screen{
+.theme-toggle{position:fixed;top:10px;right:10px;z-index:20;display:grid;place-items:center;width:36px;height:36px;padding:7px;border:1px solid var(--line);border-radius:50%;background:var(--paper);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer}.theme-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.theme-toggle:focus-visible{outline:3px solid var(--blue);outline-offset:2px}.topbar{padding-right:max(64px,calc((100vw - 1440px)/2 + 44px))}
+:root[data-theme="dark"]{color-scheme:dark;--navy:#9ccaff;--navy-2:#d4e6fc;--blue:#79b9f3;--sky:#20374c;--green:#61c997;--green-bg:#173b2e;--amber:#f0bf72;--amber-bg:#40311d;--ink:#e5edf6;--muted:#a8b9cd;--line:#364659;--paper:#182431;--wash:#101922;--shadow:0 14px 38px rgba(0,0,0,.25)}
+[data-theme="dark"] .topbar{background:linear-gradient(135deg,#152332,#1a3546);color:var(--ink)}[data-theme="dark"] .topbar .eyebrow,[data-theme="dark"] .save-state{color:#a9c9dd}
+[data-theme="dark"] label{color:var(--ink)}[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] .ghost{background:#202e3d;color:var(--ink);border-color:#506176}
+[data-theme="dark"] .cell{background:var(--paper)}[data-theme="dark"] .course-row:nth-child(even) .cell{background:#1c2937}[data-theme="dark"] .cell-source:hover{background:#283d50!important}[data-theme="dark"] .code{background:#2c4055;color:#c3ddff}[data-theme="dark"] .gestion-locked{background:#20374c!important}
+[data-theme="dark"] .primary{background:#265e92;color:#fff}[data-theme="dark"] .primary:hover{background:#3377b1}[data-theme="dark"] .gestion-next-button{background:#13816a;border-color:#42b99c;color:#fff}[data-theme="dark"] .gestion-next-button:hover{background:#1b967c}
+[data-theme="dark"] .gestion-semester select{background:#202e3d;border-color:#506176}[data-theme="dark"] .gestion-semester small{color:#c3ddff}
+[data-theme="dark"] .gestion-pdf-menu{background:var(--paper);border-color:var(--line)}[data-theme="dark"] .gestion-pdf-menu button{background:var(--paper);color:var(--ink)}[data-theme="dark"] .gestion-pdf-menu button:hover,[data-theme="dark"] .gestion-pdf-menu button:focus-visible{background:#2c4055}
+[data-theme="dark"] .history-reader,[data-theme="dark"] .reader-dropzone,[data-theme="dark"] .history-upload-toggle{background:#202e3d;border-color:#526f87;color:var(--ink)}[data-theme="dark"] .reader-dropzone.is-dragover,[data-theme="dark"] .reader-result{background:#173b2e;color:#c0efd6}[data-theme="dark"] .reader-result strong{color:#c0efd6}[data-theme="dark"] .reader-dropzone.is-pending{background:#40311d}[data-theme="dark"] .reader-drop-icon{background:#2c4055}[data-theme="dark"] #oldMentionSelect:invalid,[data-theme="dark"] #careerSelect:invalid{background:#40311d}
+}
+@media print{.theme-toggle{display:none!important}}
