@@ -5,6 +5,10 @@ const status = typeof document !== "undefined" ? document.getElementById("reader
 const resultBox = typeof document !== "undefined" ? document.getElementById("readerResult") : null;
 const dropZone = typeof document !== "undefined" ? document.getElementById("historyDropZone") : null;
 const fileName = typeof document !== "undefined" ? document.getElementById("readerFileName") : null;
+const fileChip = typeof document !== "undefined" ? document.getElementById("readerFileChip") : null;
+const readerActions = typeof document !== "undefined" ? document.getElementById("readerActions") : null;
+const startReading = typeof document !== "undefined" ? document.getElementById("startHistoryReading") : null;
+const removeFile = typeof document !== "undefined" ? document.getElementById("removeHistoryFile") : null;
 let isReading = false;
 let pendingFile = null;
 
@@ -231,7 +235,7 @@ async function handleFile(file) {
   const api = globalThis.ConvalidationImportApi;
   const context = api?.getContext();
   if (!context) {
-    updateProgress(0, "Archivo listo. Selecciona las dos menciones para iniciar la lectura automática.");
+    updateProgress(0, "Archivo listo. Selecciona las dos menciones y pulsa Iniciar lectura.");
     return false;
   }
   resultBox.hidden = true;
@@ -277,53 +281,87 @@ async function processFile(file) {
     updateProgress(0, "Formato no compatible. Usa un archivo PDF, PNG o JPG.");
     return;
   }
-  pendingFile = file;
-  if (fileName) {
-    fileName.textContent = file.name;
-    fileName.hidden = false;
-  }
-  if (resultBox) resultBox.hidden = true;
-  const context = globalThis.ConvalidationImportApi?.getContext();
-  if (!context) {
-    dropZone?.classList.add("is-pending");
-    updateProgress(0, "Archivo cargado. Selecciona la mención antigua y la mención de destino; después se leerá automáticamente.");
-    if (fileInput) fileInput.value = "";
+  if (!globalThis.ConvalidationImportApi?.getContext()) {
+    updateProgress(0, "Selecciona las menciones antes de iniciar la lectura.");
+    updateReaderControls();
     return;
   }
   isReading = true;
+  updateReaderControls();
   dropZone?.classList.remove("is-pending");
   dropZone?.classList.add("is-reading");
   dropZone?.setAttribute("aria-busy", "true");
   try {
     const completed = await handleFile(file);
-    if (completed) pendingFile = null;
-    else dropZone?.classList.add("is-pending");
+    if (!completed) dropZone?.classList.add("is-pending");
   } catch (error) {
     console.error(error);
-    pendingFile = null;
-    updateProgress(0, "No se pudo leer el archivo. Puedes continuar llenando los datos manualmente.");
+    updateProgress(0, "No se pudo leer el archivo. Puedes intentar de nuevo con Iniciar lectura o continuar manualmente.");
   } finally {
     isReading = false;
+    updateReaderControls();
     dropZone?.classList.remove("is-reading", "is-dragover");
     dropZone?.removeAttribute("aria-busy");
     if (fileInput) fileInput.value = "";
   }
 }
 
-function readPendingFileWhenReady() {
-  if (!pendingFile || isReading || !globalThis.ConvalidationImportApi?.getContext()) return;
-  processFile(pendingFile);
+function updateReaderControls() {
+  const ready = Boolean(globalThis.ConvalidationImportApi?.getContext());
+  if (fileChip) fileChip.hidden = !pendingFile;
+  if (readerActions) readerActions.hidden = !pendingFile;
+  if (startReading) {
+    startReading.disabled = isReading || !pendingFile || !ready;
+    startReading.textContent = isReading ? 'Leyendo…' : 'Iniciar lectura';
+  }
+  if (removeFile) removeFile.disabled = isReading;
+  if (fileInput) fileInput.disabled = isReading;
 }
 
-if (fileInput) fileInput.addEventListener("change", (event) => {
-  processFile(event.target.files?.[0]);
+function selectHistoryFile(file) {
+  if (!file || isReading) return;
+  if (!isAcceptedFile(file)) {
+    updateProgress(0, 'Formato no compatible. Usa un archivo PDF, PNG o JPG.');
+    return;
+  }
+  pendingFile = file;
+  if (fileName) { fileName.textContent = file.name; fileName.hidden = false; }
+  if (resultBox) { resultBox.hidden = true; resultBox.innerHTML = ''; }
+  dropZone?.classList.remove('is-pending', 'is-dragover');
+  updateProgress(0, globalThis.ConvalidationImportApi?.getContext()
+    ? 'Archivo listo. Pulsa Iniciar lectura.'
+    : 'Archivo listo. Selecciona las menciones y pulsa Iniciar lectura.');
+  updateReaderControls();
+  if (fileInput) fileInput.value = '';
+}
+
+startReading?.addEventListener('click', () => processFile(pendingFile));
+removeFile?.addEventListener('click', event => {
+  event.preventDefault(); // Evita que el label abra el selector de archivos al quitarlo.
+  event.stopPropagation();
+  if (isReading) return;
+  pendingFile = null;
+  if (fileInput) fileInput.value = '';
+  if (fileName) fileName.textContent = '';
+  if (feedback) feedback.hidden = true;
+  if (progress) progress.value = 0;
+  if (status) status.textContent = '';
+  if (resultBox) { resultBox.hidden = true; resultBox.innerHTML = ''; }
+  dropZone?.classList.remove('is-pending', 'is-reading', 'is-dragover');
+  updateReaderControls();
 });
 
-if (typeof document !== "undefined") {
-  for (const selectId of ["oldMentionSelect", "careerSelect"]) {
-    document.getElementById(selectId)?.addEventListener("change", () => queueMicrotask(readPendingFileWhenReady));
+if (fileInput) fileInput.addEventListener('change', event => selectHistoryFile(event.target.files?.[0]));
+if (typeof document !== 'undefined') {
+  for (const selectId of ['oldMentionSelect', 'careerSelect']) {
+    document.getElementById(selectId)?.addEventListener('change', () => queueMicrotask(() => {
+      updateReaderControls();
+      if (pendingFile && !isReading && progress?.value === 0) updateProgress(0,
+        globalThis.ConvalidationImportApi?.getContext() ? 'Archivo listo. Pulsa Iniciar lectura.' : 'Selecciona las menciones antes de iniciar la lectura.');
+    }));
   }
 }
+updateReaderControls();
 
 if (dropZone) {
   let dragDepth = 0;
@@ -350,7 +388,7 @@ if (dropZone) {
     event.preventDefault();
     dragDepth = 0;
     dropZone.classList.remove("is-dragover");
-    processFile(event.dataTransfer?.files?.[0]);
+    selectHistoryFile(event.dataTransfer?.files?.[0]);
   });
 }
 

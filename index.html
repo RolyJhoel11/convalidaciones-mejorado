@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="assets/logo-kardex-transparente.png?v=19.1">
   <link rel="stylesheet" href="styles.css?v=19.1">
   <link rel="stylesheet" href="print.css?v=19.3">
-  <link rel="stylesheet" href="gestion.css?v=5">
+  <link rel="stylesheet" href="gestion.css?v=6">
 </head>
 <body>
   <button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar tema" title="Cambiar tema"></button>
@@ -58,9 +58,10 @@
           <span class="reader-drop-subtitle">PDF, PNG o JPG</span>
           <span class="reader-drop-or">o</span>
           <span class="reader-upload">Seleccionar archivo</span>
-          <span class="reader-file-name" id="readerFileName" hidden></span>
+          <span class="reader-file-chip" id="readerFileChip" hidden><span class="reader-file-name" id="readerFileName"></span><button id="removeHistoryFile" class="reader-remove-file" type="button" aria-label="Quitar archivo" title="Quitar archivo">×</button></span>
           <input id="historyFile" type="file" accept="application/pdf,image/png,image/jpeg" aria-label="Seleccionar historial académico en PDF o imagen">
         </label>
+        <div class="reader-actions" id="readerActions" hidden><button id="startHistoryReading" class="ghost reader-start" type="button">Iniciar lectura</button></div>
         <div class="reader-feedback" id="readerFeedback" hidden>
           <progress id="readerProgress" max="100" value="0"></progress>
           <span id="readerStatus"></span>
@@ -149,6 +150,6 @@
   <script src="gestion-data.js?v=1"></script>
   <script src="gestion.js?v=9"></script>
   <script src="assets/vendor/tesseract.min.js"></script>
-  <script type="module" src="history-reader.mjs?v=19.2"></script>
+  <script type="module" src="history-reader.mjs?v=19.3"></script>
 </body>
 </html>
