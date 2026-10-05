@@ -362,8 +362,7 @@
       }
       const height = Math.max(group.middle.length,includeOld ? group.old.length : 0,1);
       const from1998 = inherited.has(group.course.finalCode);
-      const origin = from1998 ? ' · CONV. 1998' : '';
-      const target = {code:group.course.finalCode,name:courseName(group.course.finalName)+(includeOld ? origin : ''),pendingClass:'',highlightClass:includeOld && !from1998 ? 'print-from-2023' : ''};
+      const target = {code:group.course.finalCode,name:courseName(group.course.finalName),pendingClass:'',highlightClass:includeOld && !from1998 ? 'print-from-2023' : ''};
       for (let index=0; index<height; index++) {
         rows.push(`<tr>${includeOld ? alignedCells(group.old,index,height) : ''}${alignedCells(group.middle,index,height)}${alignedCells([target],index,height)}</tr>`);
       }
