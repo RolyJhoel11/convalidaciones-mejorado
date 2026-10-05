@@ -30,3 +30,10 @@
 .reader-file-chip{display:flex;align-items:center;justify-content:center;gap:8px;max-width:100%}.reader-file-chip[hidden],.reader-actions[hidden]{display:none!important}.reader-remove-file{flex:none;display:grid;place-items:center;width:25px;height:25px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--paper);color:var(--muted);font-size:20px;line-height:1;cursor:pointer}.reader-remove-file:hover{color:#c53b3b;border-color:#c53b3b}.reader-actions{grid-column:1/-1}.reader-start{padding:7px 12px;font-size:.8rem}.reader-start:disabled,.reader-remove-file:disabled{opacity:.5;cursor:wait}
 
 @media print{.print-view td.print-from-2023{background:#b6eee7!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Una columna uniforme para las gestiones, independiente del nombre de la materia. */
+.gestion-matrix .cell-source:has(.gestion-semester){display:grid;grid-template-columns:20px minmax(0,1fr) minmax(170px,44%);column-gap:11px;align-items:center}
+.gestion-matrix .cell-source:has(.gestion-semester)>input{grid-column:1;grid-row:1}
+.gestion-matrix .cell-source:has(.gestion-semester)>span{grid-column:2;grid-row:1;min-width:0;overflow-wrap:anywhere}
+.gestion-matrix .gestion-semester{grid-column:3;grid-row:1;width:100%;max-width:none;min-width:0;margin-left:0;align-self:center}
+.gestion-matrix .gestion-semester label,.gestion-matrix .gestion-semester select{width:100%;min-width:0}
