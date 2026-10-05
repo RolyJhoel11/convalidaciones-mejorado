@@ -273,7 +273,7 @@
     for (const course of courses) {
       if (!groups.has(course.finalCode)) groups.set(course.finalCode, {course, middle:[], old:[]});
       const suffix = inherited.has(course.finalCode) ? ' · CONV. 1998' : '';
-      groups.get(course.finalCode).middle.push({code:course.middleCode, name:courseName(course.middleName)+suffix, pendingClass:''});
+      groups.get(course.finalCode).middle.push({code:course.middleCode, name:courseName(course.middleName)+suffix, pendingClass:'', highlightClass:includeOld && !inherited.has(course.finalCode) ? 'print-from-2023' : ''});
     }
     const unmatched = [];
     if (includeOld) {
@@ -361,8 +361,9 @@
         previous = section;
       }
       const height = Math.max(group.middle.length,includeOld ? group.old.length : 0,1);
-      const origin = inherited.has(group.course.finalCode) ? ' · CONV. 1998' : ' · CONV. 2023';
-      const target = {code:group.course.finalCode,name:courseName(group.course.finalName)+(includeOld ? origin : ''),pendingClass:''};
+      const from1998 = inherited.has(group.course.finalCode);
+      const origin = from1998 ? ' · CONV. 1998' : '';
+      const target = {code:group.course.finalCode,name:courseName(group.course.finalName)+(includeOld ? origin : ''),pendingClass:'',highlightClass:includeOld && !from1998 ? 'print-from-2023' : ''};
       for (let index=0; index<height; index++) {
         rows.push(`<tr>${includeOld ? alignedCells(group.old,index,height) : ''}${alignedCells(group.middle,index,height)}${alignedCells([target],index,height)}</tr>`);
       }
@@ -372,7 +373,7 @@
       unmatched.forEach(entry => rows.push(`<tr>${printPlanCells(entry)}${printPlanCells(null)}${printPlanCells(null)}</tr>`));
     }
     $('printRows').innerHTML = rows.join('');
-    printSubtitle.textContent = includeOld ? 'FINAL · Plan 1998 - Plan 2023 - Plan 2023 ajustado · CONV. 1998 / CONV. 2023' : 'Gestión 2023 - 2025 · Materias alineadas según el plan 2023 ajustado';
+    printSubtitle.textContent = includeOld ? 'FINAL · Plan 1998 - Plan 2023 - Plan 2023 ajustado' : 'Gestión 2023 - 2025 · Materias alineadas según el plan 2023 ajustado';
     $('printName').textContent = state.name.trim(); $('printCi').textContent = state.ci.trim(); $('printRu').textContent = state.ru.trim();
     $('printCareer').textContent = DATA[state.career].name;
     $('printDate').textContent = new Intl.DateTimeFormat('es-BO').format(new Date());

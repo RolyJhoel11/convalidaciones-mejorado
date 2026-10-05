@@ -28,3 +28,5 @@
 @media print{.theme-toggle{display:none!important}}
 
 .reader-file-chip{display:flex;align-items:center;justify-content:center;gap:8px;max-width:100%}.reader-file-chip[hidden],.reader-actions[hidden]{display:none!important}.reader-remove-file{flex:none;display:grid;place-items:center;width:25px;height:25px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--paper);color:var(--muted);font-size:20px;line-height:1;cursor:pointer}.reader-remove-file:hover{color:#c53b3b;border-color:#c53b3b}.reader-actions{grid-column:1/-1}.reader-start{padding:7px 12px;font-size:.8rem}.reader-start:disabled,.reader-remove-file:disabled{opacity:.5;cursor:wait}
+
+@media print{.print-view td.print-from-2023{background:#b6eee7!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
