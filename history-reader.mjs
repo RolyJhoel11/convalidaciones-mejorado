@@ -88,12 +88,12 @@ function historyRecords(text) {
   for (const page of normalizeText(text).split('\f')) {
     current = null;
     for (const line of page.split(/\n+/)) {
-      const term = line.match(/^\s*(20\d{2})\s+(PRIMERO|SEGUNDO|II|I)\s*$/);
-      const reversedTerm = line.match(/^\s*(PRIMERO|SEGUNDO|II|I)\s*[/ -]?\s*(20\d{2})\s*$/);
+      const term = line.match(/^\s*(20\d{2})\s+(PRIMERO|SEGUNDO|VERANO|INVIERNO|II|I)\s*$/);
+      const reversedTerm = line.match(/^\s*(PRIMERO|SEGUNDO|VERANO|INVIERNO|II|I)\s*[/ -]?\s*(20\d{2})\s*$/);
       if (term || reversedTerm) {
         const year = term ? term[1] : reversedTerm[2];
         const period = term ? term[2] : reversedTerm[1];
-        semester = `${['PRIMERO','I'].includes(period) ? 'I' : 'II'}/${year}`;
+        semester = `${['PRIMERO','I'].includes(period) ? 'I' : ['SEGUNDO','II'].includes(period) ? 'II' : period}/${year}`;
       }
       else if (/^\s*20\d{2}\s+(VERANO|INVIERNO)\s*$/.test(line)) semester = '';
       // Solo la sigla al inicio de la fila identifica la materia. Una sigla
@@ -137,7 +137,7 @@ function detectOldCourses(text, rows) {
 function parseHistoryText(text, rows, modernRows = []) {
   const records = historyRecords(text);
   return {...extractIdentity(text), courses:detectApprovedCourses(records, rows),
-    modernCourses:detectApprovedCourses(records.filter(record => ['I/2023','II/2023','I/2024','II/2024'].includes(record.semester)),modernRows)};
+    modernCourses:detectApprovedCourses(records.filter(record => /^(?:I|II|VERANO|INVIERNO)\/202[34]$/.test(record.semester)),modernRows)};
 }
 
 function updateProgress(value, message) {
@@ -269,7 +269,7 @@ function showResult(parsed, applied) {
   const courses = parsed.courses || [];
   const modernCourses = parsed.modernCourses || [];
   const courseList = courses.length ? `<ul>${courses.map((course) => `<li><b>${uppercaseClean(course.code)}</b> ${uppercaseClean(course.name)}</li>`).join("")}</ul>` : `<p class="reader-warning">No se reconocieron materias del plan antiguo. Puedes continuar marcándolas manualmente.</p>`;
-  resultBox.innerHTML = `<strong>${courses.length} materia${courses.length === 1 ? "" : "s"} antigua${courses.length === 1 ? "" : "s"} marcada${courses.length === 1 ? "" : "s"}</strong>${identity.length ? `<p>${identity.join(" · ")}</p>` : ""}${courseList}${modernCourses.length ? `<p><b>${modernCourses.length} materias del plan 2023 ajustado reconocidas</b></p><ul>${modernCourses.map(course => `<li><b>${uppercaseClean(course.code)}</b> ${uppercaseClean(course.name)}</li>`).join("")}</ul>` : ""}<p>Puedes corregir cualquier dato o materia manualmente antes de generar el PDF.</p>`;
+  resultBox.innerHTML = `<strong>${courses.length} materia${courses.length === 1 ? "" : "s"} antigua${courses.length === 1 ? "" : "s"} marcada${courses.length === 1 ? "" : "s"}</strong>${identity.length ? `<p>${identity.join(" · ")}</p>` : ""}${courseList}${modernCourses.length ? `<p><b>${modernCourses.length} materias del plan 2023 ajustado reconocidas hasta el II/2024</b></p><ul>${modernCourses.map(course => `<li><b>${uppercaseClean(course.code)}</b> ${uppercaseClean(course.name)}</li>`).join("")}</ul>` : ""}<p>Puedes corregir cualquier dato o materia manualmente antes de generar el PDF.</p>`;
   resultBox.hidden = false;
   updateProgress(100, `Lectura terminada. Hay ${applied.selected} materias antiguas seleccionadas${modernCourses.length ? ` y ${modernCourses.length} materias del plan ajustado reconocidas` : ''}.`);
 }
