@@ -49,7 +49,10 @@
     seguridad:['SEG-316','INF-325','SEG-317'], industrial:['INF-319','IID-313','IID-312'],
     computacion:['COM-323','COM-317','INF-336']
   };
-  const semesters = Array.from({length:8},(_,i)=>[ `I/${2023+i}`, `II/${2023+i}` ]).flat();
+  const semesters = Array.from({length:8},(_,i)=>[ `INVIERNO/${2023+i}`, `I/${2023+i}`, `II/${2023+i}`, `VERANO/${2023+i}` ]).flat();
+  const semesterOptions = code => semesters.filter(value => !(specialCodes.includes(code) && /^(?:INVIERNO|VERANO)\/202[34]$/.test(value)));
+  const semesterLabel = value => value.replace('INVIERNO/', 'Invierno I/').replace('VERANO/', 'Verano II/');
+  const inPdfPeriod = value => /\/202[34]$/.test(value);
   const eligible = value => ['I/2023','II/2023','I/2024','II/2024'].includes(value);
   const semesterValues = () => semesterByCareer[state.career] || (semesterByCareer[state.career] = {});
   function specialCourses() {
@@ -83,9 +86,9 @@
   convalidatedElectiveCodes = function() {
     return new Set([...originalConvalidatedElectiveCodes(), ...reservedElectives()]);
   };
-  const approved = () => {
+  const approved = (forPdf = false) => {
     const inherited = inheritedCodes();
-    return [...catalog().filter(course => inherited.has(course.finalCode) || manual().has(course.id)), ...specialCourses()];
+    return [...catalog().filter(course => inherited.has(course.finalCode) || (manual().has(course.id) && (!forPdf || inPdfPeriod(semesterValues()[course.id])))), ...specialCourses()];
   };
   // El historial puede mezclar registros antiguos con asignaturas del plan ajustado.
   const originalImportContext = window.ConvalidationImportApi.getContext;
@@ -102,7 +105,7 @@
       const target = catalog().find(item => item.id === course.id);
       if (!target || inherited.has(target.finalCode)) continue;
       manual().add(target.id);
-      if (specialCodes.includes(target.id) && semesters.includes(course.semester)) semesterValues()[target.id] = course.semester;
+      if (semesterOptions(target.id).includes(course.semester)) semesterValues()[target.id] = course.semester;
     }
     persist();
     localStorage.setItem(SEMESTER_KEY, JSON.stringify(semesterByCareer));
@@ -216,12 +219,12 @@
       return `<div class="course-row" role="row"><label class="cell cell-source ${locked ? 'gestion-locked' : ''}" role="cell"><input type="checkbox" data-gestion-id="${escapeHtml(course.id)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} aria-label="${escapeHtml(course.middleCode+' '+courseName(course.middleName))}${from1998 ? ', convalidada desde 1998' : ''}"><span><span class="code">${escapeHtml(course.middleCode)}</span><span class="name">${escapeHtml(courseName(course.middleName))}${from1998 ? ' · CONV. 1998' : ''}</span></span></label><div class="cell cell-result ${checked ? 'ready' : ''}" role="cell">${checked ? `<div><span class="code">${escapeHtml(course.finalCode)}</span><span class="name">${escapeHtml(courseName(course.finalName))}</span></div>` : '<span>—</span>'}</div></div>`;
     }).join('');
     for (const input of $('matrixRows').querySelectorAll('input[data-gestion-id]')) {
-      if (!specialCodes.includes(input.dataset.gestionId) || input.disabled || !input.checked) continue;
+      if (input.disabled || !input.checked) continue;
       const code = input.dataset.gestionId;
       const holder = document.createElement('div');
       holder.className = 'gestion-semester';
       const target = catalog().find(course => course.finalCode === specialTargets[state.career]?.[specialCodes.indexOf(code)]);
-      holder.innerHTML = `<label>Gestión de aprobación (obligatoria)<select required data-semester-code="${code}" aria-label="Gestión de aprobación de ${code}"><option value="">Selecciona la gestión</option>${semesters.map(value => `<option value="${value}" ${semesterValues()[code] === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>${eligible(semesterValues()[code]) && target ? `<small>64 horas: también convalida ${escapeHtml(target.finalCode)} ${escapeHtml(courseName(target.finalName))}</small>` : ''}`;
+      holder.innerHTML = `<label>Gestión de aprobación (obligatoria)<select required data-semester-code="${code}" aria-label="Gestión de aprobación de ${code}"><option value="">Selecciona la gestión</option>${semesterOptions(code).map(value => `<option value="${value}" ${semesterValues()[code] === value ? 'selected' : ''}>${semesterLabel(value)}</option>`).join('')}</select></label>${eligible(semesterValues()[code]) && target ? `<small>64 horas: también convalida ${escapeHtml(target.finalCode)} ${escapeHtml(courseName(target.finalName))}</small>` : ''}`;
       input.closest('.cell').append(holder);
 
     }
@@ -321,7 +324,8 @@
       return originalBuildPrintView();
     }
     // Validación compartida: tampoco permite saltarse la gestión desde el PDF antiguo.
-    const missing = specialCodes.find(code => manual().has(code) && !inheritedCodes().has(code) && !semesters.includes(semesterValues()[code]));
+    const inheritedForValidation = inheritedCodes();
+    const missing = catalog().find(course => manual().has(course.id) && !inheritedForValidation.has(course.finalCode) && !semesterOptions(course.id).includes(semesterValues()[course.id]))?.id;
     if (missing) {
       goToChoice('2023', `[data-semester-code="${missing}"]`);
       toast(`Selecciona obligatoriamente la gestión de aprobación de ${missing}.`);
@@ -343,8 +347,8 @@
     if (includeOld) {
       if (!state.oldMention || !OLD_MENTIONS[state.oldMention]) { toast('Selecciona la mención del plan 1998.'); return false; }
     }
-    const courses = approved();
-    if (!courses.length) { toast('Selecciona al menos una materia aprobada.'); return false; }
+    const courses = approved(true);
+    if (!courses.length) { toast('No hay materias convalidadas desde 1998 ni materias nuevas de 2023–2024 para incluir en el PDF.'); return false; }
     const mention = escapeHtml(DATA[state.career].name);
     printTable.querySelector('colgroup').innerHTML = '<col class="code-col"><col class="name-col">'.repeat(includeOld ? 3 : 2);
     const oldTitle = includeOld ? `<th colspan="2">PÉNSUM 1998<br><span>MENCIÓN <b>${escapeHtml(OLD_MENTIONS[state.oldMention])}</b></span><br><span>NIVEL LICENCIATURA</span></th>` : '';
