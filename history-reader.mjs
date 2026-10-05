@@ -88,8 +88,13 @@ function historyRecords(text) {
   for (const page of normalizeText(text).split('\f')) {
     current = null;
     for (const line of page.split(/\n+/)) {
-      const term = line.match(/^\s*(20\d{2})\s+(PRIMERO|SEGUNDO|I|II)\s*$/);
-      if (term) semester = `${['PRIMERO','I'].includes(term[2]) ? 'I' : 'II'}/${term[1]}`;
+      const term = line.match(/^\s*(20\d{2})\s+(PRIMERO|SEGUNDO|II|I)\s*$/);
+      const reversedTerm = line.match(/^\s*(PRIMERO|SEGUNDO|II|I)\s*[/ -]?\s*(20\d{2})\s*$/);
+      if (term || reversedTerm) {
+        const year = term ? term[1] : reversedTerm[2];
+        const period = term ? term[2] : reversedTerm[1];
+        semester = `${['PRIMERO','I'].includes(period) ? 'I' : 'II'}/${year}`;
+      }
       else if (/^\s*20\d{2}\s+(VERANO|INVIERNO)\s*$/.test(line)) semester = '';
       // Solo la sigla al inicio de la fila identifica la materia. Una sigla
       // dentro de su nombre (LABORATORIO DE INF 111) no crea otro registro.
@@ -132,7 +137,7 @@ function detectOldCourses(text, rows) {
 function parseHistoryText(text, rows, modernRows = []) {
   const records = historyRecords(text);
   return {...extractIdentity(text), courses:detectApprovedCourses(records, rows),
-    modernCourses:detectApprovedCourses(records,modernRows)};
+    modernCourses:detectApprovedCourses(records.filter(record => ['I/2023','II/2023','I/2024','II/2024'].includes(record.semester)),modernRows)};
 }
 
 function updateProgress(value, message) {
