@@ -82,20 +82,57 @@ function matchingCourseBlocks(normalized, code) {
   return blocks;
 }
 
-function detectOldCourses(text, rows) {
-  const normalized = normalizeText(text);
-  // Cada registro termina antes de la siguiente sigla o página. Nunca toma
-  // el estado de aprobación de una materia vecina ni deduce aprobación del nombre.
-  return (rows || []).filter(row => {
-    const code = canonicalCode(row.code);
-    return normalized.split('\f').some(page => matchingCourseBlocks(page, code).some(block =>
-      approvalPattern.test(block) && !nonApprovalPattern.test(block)
-    ));
+function historyRecords(text) {
+  const records = [];
+  let current = null, semester = '';
+  for (const page of normalizeText(text).split('\f')) {
+    current = null;
+    for (const line of page.split(/\n+/)) {
+      const term = line.match(/^\s*(20\d{2})\s+(PRIMERO|SEGUNDO|I|II)\s*$/);
+      if (term) semester = `${['PRIMERO','I'].includes(term[2]) ? 'I' : 'II'}/${term[1]}`;
+      else if (/^\s*20\d{2}\s+(VERANO|INVIERNO)\s*$/.test(line)) semester = '';
+      // Solo la sigla al inicio de la fila identifica la materia. Una sigla
+      // dentro de su nombre (LABORATORIO DE INF 111) no crea otro registro.
+      const start = line.match(/^\s*(?:\d+\s+)?([A-Z]{2,4}\s*[- ]?\s*\d{3})\b\s*(.*)$/);
+      if (start) {
+        current = {code:canonicalCode(start[1]), text:start[2], semester};
+        records.push(current);
+      } else if (/^\s*(?:NRO\.|INSCRITAS|MATRICULAS|UNIVERSIDAD|HISTORIAL|PENSUM|20\d{2}\b)/.test(line)) {
+        current = null;
+      } else if (current && line.trim()) current.text += ` ${line.trim()}`;
+    }
+  }
+  return records;
+}
+
+function recordMatchesName(record, name) {
+  const expected = normalizeText(name);
+  const tokens = courseTokens(expected);
+  const actual = normalizeText(record.text).split(/\b(?:APROB|REPROB|CONV|ABANDONO)/)[0];
+  const matched = tokens.filter(token => tokenPresent(actual,token)).length;
+  if (tokens.length && matched < Math.max(1,Math.ceil(tokens.length * 0.6))) return false;
+  // Diferencia, por ejemplo, Física I de Física II y Programación I de Web II.
+  const numerals = expected.match(/\b(?:I|II|III|IV|V)\b/g) || [];
+  return numerals.every(token => new RegExp(`\\b${token}\\b`).test(actual));
+}
+
+function detectApprovedCourses(records, rows) {
+  return (rows || []).flatMap(row => {
+    const record = records.find(record => record.code === canonicalCode(row.code)
+      && approvalPattern.test(record.text) && !nonApprovalPattern.test(record.text)
+      && recordMatchesName(record,row.name));
+    return record ? [{...row, semester:record.semester}] : [];
   });
 }
 
-function parseHistoryText(text, rows) {
-  return {...extractIdentity(text), courses:detectOldCourses(text, rows)};
+function detectOldCourses(text, rows) {
+  return detectApprovedCourses(historyRecords(text), rows);
+}
+
+function parseHistoryText(text, rows, modernRows = []) {
+  const records = historyRecords(text);
+  return {...extractIdentity(text), courses:detectApprovedCourses(records, rows),
+    modernCourses:detectApprovedCourses(records,modernRows)};
 }
 
 function updateProgress(value, message) {
@@ -225,17 +262,18 @@ async function ocrImage(file) {
 function showResult(parsed, applied) {
   const identity = [parsed.name && `Nombre: ${parsed.name}`, parsed.ci && `CI: ${parsed.ci}`, parsed.ru && `RU: ${parsed.ru}`].filter(Boolean);
   const courses = parsed.courses || [];
+  const modernCourses = parsed.modernCourses || [];
   const courseList = courses.length ? `<ul>${courses.map((course) => `<li><b>${uppercaseClean(course.code)}</b> ${uppercaseClean(course.name)}</li>`).join("")}</ul>` : `<p class="reader-warning">No se reconocieron materias del plan antiguo. Puedes continuar marcándolas manualmente.</p>`;
-  resultBox.innerHTML = `<strong>${courses.length} materia${courses.length === 1 ? "" : "s"} antigua${courses.length === 1 ? "" : "s"} marcada${courses.length === 1 ? "" : "s"}</strong>${identity.length ? `<p>${identity.join(" · ")}</p>` : ""}${courseList}<p>Puedes corregir cualquier dato o materia manualmente antes de generar el PDF.</p>`;
+  resultBox.innerHTML = `<strong>${courses.length} materia${courses.length === 1 ? "" : "s"} antigua${courses.length === 1 ? "" : "s"} marcada${courses.length === 1 ? "" : "s"}</strong>${identity.length ? `<p>${identity.join(" · ")}</p>` : ""}${courseList}${modernCourses.length ? `<p><b>${modernCourses.length} materias del plan 2023 ajustado reconocidas</b></p><ul>${modernCourses.map(course => `<li><b>${uppercaseClean(course.code)}</b> ${uppercaseClean(course.name)}</li>`).join("")}</ul>` : ""}<p>Puedes corregir cualquier dato o materia manualmente antes de generar el PDF.</p>`;
   resultBox.hidden = false;
-  updateProgress(100, `Lectura terminada. Hay ${applied.selected} materias seleccionadas en total.`);
+  updateProgress(100, `Lectura terminada. Hay ${applied.selected} materias antiguas seleccionadas${modernCourses.length ? ` y ${modernCourses.length} materias del plan ajustado reconocidas` : ''}.`);
 }
 
 async function handleFile(file) {
   const api = globalThis.ConvalidationImportApi;
   const context = api?.getContext();
   if (!context) {
-    updateProgress(0, "Archivo listo. Selecciona las dos menciones y pulsa Iniciar lectura.");
+    updateProgress(0, "Archivo listo. Selecciona las dos menciones para iniciar la lectura automática.");
     return false;
   }
   resultBox.hidden = true;
@@ -261,8 +299,8 @@ async function handleFile(file) {
   } else {
     throw new Error("Selecciona un archivo PDF, PNG o JPG.");
   }
-  const parsed = parseHistoryText(text, context.rows);
-  const applied = api.apply({name:parsed.name, ci:parsed.ci, ru:parsed.ru, rowIds:parsed.courses.map((course) => course.id)});
+  const parsed = parseHistoryText(text, context.rows, context.modernRows);
+  const applied = api.apply({name:parsed.name, ci:parsed.ci, ru:parsed.ru, rowIds:parsed.courses.map((course) => course.id), modernCourses:parsed.modernCourses});
   showResult(parsed, applied);
   return true;
 }
@@ -330,9 +368,10 @@ function selectHistoryFile(file) {
   dropZone?.classList.remove('is-pending', 'is-dragover');
   updateProgress(0, globalThis.ConvalidationImportApi?.getContext()
     ? 'Archivo listo. Pulsa Iniciar lectura.'
-    : 'Archivo listo. Selecciona las menciones y pulsa Iniciar lectura.');
+    : 'Archivo listo. Selecciona las menciones para iniciar la lectura automática.');
   updateReaderControls();
   if (fileInput) fileInput.value = '';
+  if (globalThis.ConvalidationImportApi?.getContext()) processFile(pendingFile);
 }
 
 startReading?.addEventListener('click', () => processFile(pendingFile));
@@ -356,6 +395,7 @@ if (typeof document !== 'undefined') {
   for (const selectId of ['oldMentionSelect', 'careerSelect']) {
     document.getElementById(selectId)?.addEventListener('change', () => queueMicrotask(() => {
       updateReaderControls();
+      if (pendingFile && !isReading && progress?.value === 0 && globalThis.ConvalidationImportApi?.getContext()) { processFile(pendingFile); return; }
       if (pendingFile && !isReading && progress?.value === 0) updateProgress(0,
         globalThis.ConvalidationImportApi?.getContext() ? 'Archivo listo. Pulsa Iniciar lectura.' : 'Selecciona las menciones antes de iniciar la lectura.');
     }));
@@ -366,6 +406,7 @@ updateReaderControls();
 if (dropZone) {
   let dragDepth = 0;
   dropZone.addEventListener("keydown", (event) => {
+    if (event.target !== dropZone) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     fileInput?.click();

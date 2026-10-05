@@ -87,6 +87,28 @@
     const inherited = inheritedCodes();
     return [...catalog().filter(course => inherited.has(course.finalCode) || manual().has(course.id)), ...specialCourses()];
   };
+  // El historial puede mezclar registros antiguos con asignaturas del plan ajustado.
+  const originalImportContext = window.ConvalidationImportApi.getContext;
+  const originalImportApply = window.ConvalidationImportApi.apply;
+  window.ConvalidationImportApi.getContext = function() {
+    const context = originalImportContext();
+    return context ? {...context, modernRows:catalog().map(course => ({id:course.id,
+      code:course.finalCode, name:course.finalName}))} : null;
+  };
+  window.ConvalidationImportApi.apply = function(input) {
+    const applied = originalImportApply(input);
+    const inherited = inheritedCodes();
+    for (const course of input.modernCourses || []) {
+      const target = catalog().find(item => item.id === course.id);
+      if (!target || inherited.has(target.finalCode)) continue;
+      manual().add(target.id);
+      if (specialCodes.includes(target.id) && semesters.includes(course.semester)) semesterValues()[target.id] = course.semester;
+    }
+    persist();
+    localStorage.setItem(SEMESTER_KEY, JSON.stringify(semesterByCareer));
+    render();
+    return applied;
+  };
   const matrix = document.querySelector('.matrix');
   const oldHeader = document.querySelector('.matrix-header.plan-old');
   const middleHeader = document.querySelector('.matrix-header.plan-mid');
