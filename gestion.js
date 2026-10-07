@@ -261,7 +261,10 @@
     if (mode !== '2023') return;
     event.stopImmediatePropagation();
     if (!manual().size || confirm('¿Limpiar las materias marcadas en 2023? Las convalidadas desde 1998 se conservarán.')) {
-      manual().clear(); persist(); render();
+      manual().clear();
+      semesterByCareer[state.career] = {};
+      localStorage.setItem(SEMESTER_KEY, JSON.stringify(semesterByCareer));
+      persist(); render();
     }
   },true);
   const printTable = document.querySelector('#printView table');
